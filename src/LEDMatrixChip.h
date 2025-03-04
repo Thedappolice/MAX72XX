@@ -1,52 +1,34 @@
-#ifndef LEDMATRIXCHIP_H
-#define LEDMATRIXCHIP_H
+#pragma once
 
 #include <Arduino.h>
 
-class LEDMatrixChip 
+class LEDMatrixChip
 {
 public:
-    // Constructor
-    LEDMatrixChip(int CS, int CLK, int MOSI, int amount = 1);
+    LEDMatrixChip(int CS, int CLK, int MOSI, int amount = 1, int orientation = 0);
 
-    //clean up display
-    void clear();
+    void clear(int nth = 0);                    // Clears the display (all or specific matrix)
+    void turnOn(int Col, int Row, int nth = 0); // Turns on a specific LED
+    void OnCol(int Col, int nth = 0);           // Turns on an entire column
+    void OnRow(int Row, int nth = 0);           // Turns on an entire row
 
-    // Turn on x-Col's, y-Row's LED
-    void turnOn(int Col, int Row);
+    void customCol(uint8_t userByte, int Col, int nth = 0, int shift = 0); // Custom column display
+    void customRow(uint8_t userByte, int Row, int nth = 0, int shift = 0); // Custom row display
 
-    // // Turn on entire x-Col
-    void OnCol(int Col);
-
-    // // Turn on entire y-Row
-    void OnRow(int Row);
-
-    // // Turn on x-Col by given array, shiftable by +/- n
-    void customCol(byte userByte, int Col, int shift = 0);
-
-    // // Turn on y-Row by given array, shiftable by +/- n
-    void customRow(byte userByte, int Row, int shift = 0);
-
-    // Check all possible LED
-    void Test();
-
-    // // Display custom symbol
-    void Symbol(byte UserMatrix[8]);
+    void Test();                                     // Runs a test pattern
+    void Symbol(uint8_t UserMatrix[8], int nth = 0); // Displays a custom symbol
 
 private:
-    // Pin variables for chip communication
-    int CS;
-    int CLK;
-    int MOSI;
-    int amount;
+    int CS, CLK, MOSI, amount, orientation;
+    uint8_t displayByte = 0x00;
+    uint8_t **rows;
 
-    byte displayByte = 0x00;
-
-    // Private methods for handling chip communication
-    void transfer(uint8_t *p_data, uint8_t len); // Private transfer function to send data to the chip
-    void write_reg(uint8_t reg, uint8_t value);  // Send a value to a specific register on the chip
-    size_t limitingGrid(int value);    // Limit the grid to 0-7
-    void adjustShift(int shift, byte userArray); // Shift the array by n
+    void transfer(uint8_t *p_data, uint8_t len);    // SPI-like data transfer
+    void write_reg(uint8_t reg, uint8_t value);     // Writes a value to a register
+    void write_display();                           // Updates the display with the buffer
+    void deselectChip();                            // Deselects the chip
+    uint8_t limitingGrid(int value);                // Constrains value between 0-7
+    void adjustShift(int shift, uint8_t userArray); // Shifts a byte
+    void clearAll();                                // Clears all matrices
+    void clearNth(int nth);                         // Clears a specific matrix
 };
-
-#endif // LEDMATRIXCHIP_H
