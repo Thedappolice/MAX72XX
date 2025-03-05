@@ -1,16 +1,16 @@
 // this program uses Arduino Nano
 
-#include <LEDMatrix.h>
+#include <LEDMatrixChip.h>
 
-// Pin configurations for LED Matrix
-int POS_PIN[] = {2, 3, 4, 5, 6, 7, 8, 9};
-int NEG_PIN[] = {10, 11, 12, 13, A0, A1, A2, A3};
+// Define SPI communication pins
+#define DATA_PIN 2
+#define CHIP_SELECT_PIN 3
+#define CLOCK_PIN 4
+
+LEDMatrixChip LM(CHIP_SELECT_PIN, CLOCK_PIN, DATA_PIN, 1, 0);
 
 // Wall pattern array
-int WALL[] = {0, 0, 1, 1, 1, 0, 0, 0};
-
-// LED Matrix object initialization
-LEDMatrix<8, 8> LM(POS_PIN, NEG_PIN);
+uint8_t WALL = 0b00111000;
 
 // Pins for the buttons
 #define P1_LEFT A4
@@ -44,108 +44,116 @@ Ball ball = {(int)random(3, 5), (int)random(3, 5), random(0, 2) == 0, random(0, 
 
 int memory[8][8] = {{0}};
 
-void ShowSymbol(char input, unsigned long delay = 0)
+void ShowSymbol(char input, unsigned long delayTime = 0)
 {
   // display arrays
-  int display[8][8] = {{0}};
-  int W[8][8] = {
-      {1, 0, 0, 0, 0, 0, 0, 1},
-      {1, 0, 0, 0, 0, 0, 0, 1},
-      {1, 0, 0, 1, 1, 0, 0, 1},
-      {1, 1, 0, 1, 1, 0, 1, 1},
-      {1, 1, 0, 1, 1, 0, 1, 1},
-      {1, 1, 1, 0, 0, 1, 1, 1},
-      {0, 1, 1, 0, 0, 1, 1, 0},
-      {0, 1, 0, 0, 0, 0, 1, 0}};
-  int I[8][8] = {
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0}};
-  int N[8][8] = {
-      {1, 1, 0, 0, 0, 0, 1, 1},
-      {1, 1, 1, 0, 0, 0, 1, 1},
-      {1, 1, 1, 1, 0, 0, 1, 1},
-      {1, 1, 1, 1, 1, 0, 1, 1},
-      {1, 1, 0, 1, 1, 1, 1, 1},
-      {1, 1, 0, 0, 1, 1, 1, 1},
-      {1, 1, 0, 0, 0, 1, 1, 1},
-      {1, 1, 0, 0, 0, 0, 1, 1}};
-  int P[8][8] = {
-      {0, 1, 1, 1, 1, 1, 0, 0},
-      {0, 1, 1, 0, 0, 0, 1, 0},
-      {0, 1, 1, 0, 0, 0, 1, 0},
-      {0, 1, 1, 1, 1, 1, 0, 0},
-      {0, 1, 1, 0, 0, 0, 0, 0},
-      {0, 1, 1, 0, 0, 0, 0, 0},
-      {0, 1, 1, 0, 0, 0, 0, 0},
-      {0, 1, 1, 0, 0, 0, 0, 0}};
-  int N1[8][8] = {
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 0, 1, 1, 1, 0, 0, 0},
-      {0, 1, 1, 1, 1, 0, 0, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 0, 0, 1, 1, 0, 0, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0}};
-  int N2[8][8] = {
-      {0, 0, 1, 1, 1, 1, 0, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 1, 1, 0, 0, 1, 1, 0},
-      {0, 0, 0, 0, 1, 1, 1, 0},
-      {0, 0, 0, 1, 1, 1, 0, 0},
-      {0, 0, 1, 1, 1, 0, 0, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0}};
-  int N3[8][8] = {
-      {0, 0, 1, 1, 1, 1, 0, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 0, 0, 0, 0, 1, 1, 0},
-      {0, 0, 1, 1, 1, 1, 0, 0},
-      {0, 0, 1, 1, 1, 1, 0, 0},
-      {0, 0, 0, 0, 0, 1, 1, 0},
-      {0, 1, 1, 1, 1, 1, 1, 0},
-      {0, 0, 1, 1, 1, 1, 0, 0}};
+  uint8_t display[8] = {0};
+  uint8_t W[8] =
+      {0b10000001,
+       0b10000001,
+       0b10011001,
+       0b11011011,
+       0b11011011,
+       0b11100111,
+       0b01100110,
+       0b01000010};
+
+  uint8_t I[8] =
+      {0b01111110,
+       0b01111110,
+       0b00011000,
+       0b00011000,
+       0b00011000,
+       0b00011000,
+       0b01111110,
+       0b01111110};
+
+  uint8_t N[8] =
+      {0b11000011,
+       0b11100011,
+       0b11110011,
+       0b11111011,
+       0b11011111,
+       0b11001111,
+       0b11000111,
+       0b11000011};
+
+  uint8_t P[8] =
+      {0b01111100,
+       0b01100110,
+       0b01100110,
+       0b01111100,
+       0b01100000,
+       0b01100000,
+       0b01100000,
+       0b01100000};
+
+  uint8_t N1[8] =
+      {0b00011000,
+       0b00111000,
+       0b01111000,
+       0b00011000,
+       0b00011000,
+       0b00011000,
+       0b01111110,
+       0b01111110};
+
+  uint8_t N2[8] =
+      {0b00111100,
+       0b01111110,
+       0b01100110,
+       0b00001110,
+       0b00011110,
+       0b00111000,
+       0b01111110,
+       0b01111110};
+
+  uint8_t N3[8] =
+      {0b00111100,
+       0b01111110,
+       0b00000110,
+       0b00111110,
+       0b00111110,
+       0b00000110,
+       0b01111110,
+       0b00111100};
 
   // Copy input symbol to display array
   switch (input)
   {
   case 'W':
-    memcpy(display, W, 8 * 8 * sizeof(int));
+    memcpy(display, W, 8 * sizeof(uint8_t));
     break;
   case 'I':
-    memcpy(display, I, 8 * 8 * sizeof(int));
+    memcpy(display, I, 8 * sizeof(uint8_t));
     break;
   case 'N':
-    memcpy(display, N, 8 * 8 * sizeof(int));
+    memcpy(display, N, 8 * sizeof(uint8_t));
     break;
   case 'P':
-    memcpy(display, P, 8 * 8 * sizeof(int));
+    memcpy(display, P, 8 * sizeof(uint8_t));
     break;
   case '1':
-    memcpy(display, N1, 8 * 8 * sizeof(int));
+    memcpy(display, N1, 8 * sizeof(uint8_t));
     break;
   case '2':
-    memcpy(display, N2, 8 * 8 * sizeof(int));
+    memcpy(display, N2, 8 * sizeof(uint8_t));
     break;
   case '3':
-    memcpy(display, N3, 8 * 8 * sizeof(int));
+    memcpy(display, N3, 8 * sizeof(uint8_t));
     break;
   }
 
   // Call the LM.Symbol function to display the symbol on the LED matrix with time if given
-  if (delay != 0)
+  if (delayTime != 0)
   {
-    LM.Symbol(display, delay);
+    LM.Symbol(display);
+    delay(delayTime);
   }
   else
   {
     LM.Symbol(display);
+    delay(1000);
   }
 };
 

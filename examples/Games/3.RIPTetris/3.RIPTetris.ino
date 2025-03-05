@@ -17,31 +17,23 @@ int scoreNum[4] = {-1, -1, -1, -1};
 int score = 0;
 
 // Pin Definitions for Controls
-#define ROTATE_PIN 31
-#define LEFT_PIN 32
-#define RIGHT_PIN 33
-#define DOWN_PIN 30
-#define RESET_PIN 34
+#define ROTATE_PIN 32
+#define LEFT_OR_RIGHT_PIN 23
+#define UP_OR_DOWN_PIN 22
 
 // Grid Constants
 #define GRID_WIDTH 8                      // Number of columns in the grid
 #define GRID_HEIGHT (GRID_WIDTH * 2)      // Total grid height (16 rows for an 8x8 matrix)
 #define CHECKING_HEIGHT (GRID_HEIGHT + 2) // Includes extra rows for overflow checking
 
-// LED Matrix Library and Pin Configurations
-#include <LEDMatrix.h>
+#include <LEDMatrixChip.h>
 
-// Pin configurations for the top LED matrix
-int posPintop[] = {37, 13, 16, 40, 23, 17, 22, 19};
-int negPintop[] = {41, 21, 20, 38, 18, 39, 14, 15};
+// Define SPI communication pins
+#define DATA_PIN 2
+#define CHIP_SELECT_PIN 3
+#define CLOCK_PIN 4
 
-// Pin configurations for the bottom LED matrix
-int posPinbot[] = {9, 4, 29, 6, 10, 28, 11, 26};
-int negPinbot[] = {5, 12, 25, 8, 27, 7, 3, 2};
-
-// Create instances for LED matrices
-LEDMatrix<GRID_WIDTH, GRID_WIDTH> LMtop(posPintop, negPintop);
-LEDMatrix<GRID_WIDTH, GRID_WIDTH> LMbot(posPinbot, negPinbot);
+LEDMatrixChip LM(CHIP_SELECT_PIN, CLOCK_PIN, DATA_PIN, 2, 0);
 
 // Game Data Structures
 
@@ -55,15 +47,15 @@ typedef struct
 
 // Global Variables
 
-Tetrimino currentShape = {{{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, false}; // Current active Tetrimino
+Tetrimino currentShape = {0}; // Current active Tetrimino
 
 // Memory structure for the game grid
 struct GridMemory
 {
     int stable[CHECKING_HEIGHT][GRID_WIDTH];  // Stable grid (occupied blocks)
     int display[CHECKING_HEIGHT][GRID_WIDTH]; // Display grid (active shapes + stable grid)
-    int top[GRID_WIDTH][GRID_WIDTH];          // Top LED matrix data
-    int bottom[GRID_WIDTH][GRID_WIDTH];       // Bottom LED matrix data
+    uint8_t top[GRID_WIDTH];                  // Top LED matrix data
+    uint8_t bottom[GRID_WIDTH];               // Bottom LED matrix data
 
     // Clears the stable grid
     void clearStable()
@@ -81,11 +73,13 @@ struct GridMemory
 // Create an instance of GridMemory
 GridMemory grid;
 
-// Timing Variables
-unsigned long lastInputTime = 0;   // Last time input was processed
-unsigned long inputInterval = 100; // Interval between inputs (ms)
-unsigned long prev = 0;            // Previous time for game interval
-unsigned long interval = 500;      // Time between automatic block drops (ms)
+// Timing for game
+unsigned long prev = 0;       // Previous time for game interval
+unsigned long interval = 500; // Time between automatic block drops (ms)
+
+// timing for inputs
+unsigned long inputprev = 0;       // Previous time for input
+unsigned long inputinterval = 100; // Time between accpeted inputs (ms)
 
 // Track the previous state of the rotate button
 bool previousRotateState = LOW;
@@ -161,15 +155,12 @@ void ShowSymbol(LEDMatrix<8, 8> &LM, char input, unsigned long duration = 0)
         symbolIndex = 3;
         break;
     default:
-        Serial.println("Invalid symbol input!");
-        return; // Exit if the input is invalid
+        break;
     }
 
     // Display the symbol on the LED matrix
-    if (symbolIndex != -1)
-    {
-        (duration > 0) ? LM.Symbol((int(*)[8])symbols[symbolIndex], duration) : LM.Symbol((int(*)[8])symbols[symbolIndex]);
-    }
+    LM.Symbol(symbols[symbolIndex]);
+    delay(duration);
 }
 
 /**
@@ -313,7 +304,7 @@ void scanAndClearGrid()
 
     int clearedRows = 0;
 
-    // Check and clear full rows from bottom to top
+    // Scan from bottom to top to find and clear full rows
     for (int i = CHECKING_HEIGHT - 1; i >= 3; i--)
     {
         bool isFull = true;
@@ -328,19 +319,31 @@ void scanAndClearGrid()
 
         if (isFull)
         {
-            clearRow(i); // Clear the full row
             clearedRows++;
-        }
-        else if (clearedRows > 0)
-        {
-            shiftRowsDown(i + clearedRows); // Shift rows down if rows were cleared
+            clearRow(i); // Clear this row
+
+            // Shift all rows above down by one
+
+            for (int k = i; k > 0; k--)
+            {
+                memcpy(grid.stable[k], grid.stable[k - 1], sizeof(grid.stable[k]));
+            }
+
+            // Reset the top row to empty
+            memset(grid.stable[0], 0, sizeof(grid.stable[0]));
+
+            // Since we shifted everything down, we must re-check this row
+            i++;
         }
     }
 
     // Update the score based on the number of cleared rows
     if (clearedRows > 0)
     {
-        score += pow(clearedRows, clearedRows); // Exponential scoring based on rows cleared
+        // Tetris standard scoring system
+        int points[] = {0, 40, 100, 300, 1200};
+        score += points[clearedRows];
+        // Cap the score at 9999
         if (score > 9999)
         {
             score = 9999; // Cap the score at 9999
@@ -353,21 +356,40 @@ void scanAndClearGrid()
  */
 void checkInput()
 {
-    if (digitalRead(LEFT_PIN) == HIGH)
+    // Read the current state of the rotation button
+
+    bool currentRotateState = digitalRead(ROTATE_PIN);
+
+    // Detect rising edge: from LOW to HIGH
+
+    if (currentRotateState == HIGH && previousRotateState == LOW)
+
+    {
+
+        alterShape(3); // Rotate once
+    }
+
+    // Update the previous state
+
+    previousRotateState = currentRotateState;
+
+    // // Other button inputs (no changes needed)
+    int Xvalue = analogRead(LEFT_OR_RIGHT_PIN);
+    int Yvalue = analogRead(UP_OR_DOWN_PIN);
+
+    if (Xvalue > 900)
     {
         alterShape(-1); // Move Left
     }
-    if (digitalRead(RIGHT_PIN) == HIGH)
+
+    if (Xvalue < 100)
     {
         alterShape(1); // Move Right
     }
-    if (digitalRead(DOWN_PIN) == HIGH)
+
+    if (Yvalue > 900)
     {
         alterShape(0); // Move Down
-    }
-    if (digitalRead(RESET_PIN) == HIGH)
-    {
-        resetGame(); // Reset the game
     }
 }
 
@@ -376,8 +398,12 @@ void checkInput()
  */
 void gatherAndDisplay()
 {
-    // Copy the stable grid into the display grid
-    memcpy(grid.display, grid.stable, sizeof(grid.stable));
+
+    if (!end)
+        // Copy the stable grid into the display grid
+        memcpy(grid.display, grid.stable, sizeof(grid.stable));
+    memset(grid.top, 0, sizeof(grid.top));
+    memset(grid.bottom, 0, sizeof(grid.bottom));
 
     // Add the active shape to the display grid
     for (int i = 0; i < 4; i++)
@@ -390,11 +416,19 @@ void gatherAndDisplay()
     {
         memcpy(grid.top[i], &grid.display[i + 2][0], sizeof(grid.top[i]));                    // Top matrix
         memcpy(grid.bottom[i], &grid.display[i + GRID_WIDTH + 2][0], sizeof(grid.bottom[i])); // Bottom matrix
+        for (int j = 0; j < GRID_WIDTH; j++)
+        {
+            if (grid.display[i + 2][j] == 1)
+                grid.top[i] |= 1 << j;
+
+            if (grid.display[i + GRID_WIDTH + 2][j] == 1)
+                grid.bottom[i] |= 1 << j;
+        }
     }
 
     // Send updated data to the LED matrices
-    LMtop.Symbol(grid.top, 2);
-    LMbot.Symbol(grid.bottom, 2);
+    LMtop.Symbol(grid.top, 0);
+    LMbot.Symbol(grid.bottom, 1);
 }
 
 /**
@@ -402,7 +436,7 @@ void gatherAndDisplay()
  */
 void showEndAnimation()
 {
-    for (int i = GRID_HEIGHT - 1; i >= 0; i--)
+    for (int i = CHECKING_HEIGHT; i > 0; i--)
     {
         for (int j = 0; j < GRID_WIDTH; j++)
         {
@@ -477,13 +511,9 @@ void updateScoreDisplay()
 void setup()
 {
     // Initialize control pins as input
-    int pins[] = {ROTATE_PIN, LEFT_PIN, RIGHT_PIN, DOWN_PIN, RESET_PIN}; // traditional method bc arduino doenst support c++ 11
-    for (int i = 0; i < 5; i++)
-    {
-        pinMode(pins[i], INPUT);
-    }
+    pinMode(ROTATE_PIN, INPUT);
 
-    randomSeed(analogRead(24)); // Seed the random number generator
+    randomSeed(analogRead(21)); // Seed the random number generator
 }
 
 /**
@@ -497,17 +527,23 @@ void loop()
     }
     else if (!end)
     {
-        genShape();   // Generate a new shape if needed
-        checkInput(); // Process player inputs
+        genShape(); // Generate a new shape if needed
 
         // Handle automatic downward movement
+
         if (millis() - prev >= interval)
         {
             prev = millis();
-            alterShape(0); // Move the shape down automatically
+            alterShape(0);
         }
 
-        gatherAndDisplay(); // Update the display
+        // Handle input timing here instead of inside checkInput()
+        if (millis() - inputprev >= inputinterval)
+        {
+            inputprev = millis();
+            checkInput(); // Now checkInput() just reads and acts on inputs
+        }
+        gatherAndDisplay();
     }
     else
     {

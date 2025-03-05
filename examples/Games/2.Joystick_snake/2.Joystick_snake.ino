@@ -1,13 +1,13 @@
 // this program uses Arduino Nano
 
-#include <LEDMatrix.h>
+#include <LEDMatrixChip.h>
 
-// Pin configurations
-int posPin[] = {2, 3, 4, 5, 6, 7, 8, 9};
-int negPin[] = {10, 11, 12, 13, A0, A1, A2, A3};
+// Define SPI communication pins
+#define DATA_PIN 2
+#define CHIP_SELECT_PIN 3
+#define CLOCK_PIN 4
 
-// Initialize LEDMatrix instance
-LEDMatrix<8, 8> LM(posPin, negPin);
+LEDMatrixChip LM(CHIP_SELECT_PIN, CLOCK_PIN, DATA_PIN, 1, 0);
 
 unsigned long interval = 500; // Refresh interval in milliseconds
 
@@ -33,78 +33,86 @@ int memory[8][8] = {
     {0, 0, 0, 0, 3, 0, 0, 0},
     {0, 0, 0, 0, 0, 0, 0, 0}};
 
+uint8_t displayBytes[8] = {0};
+
 char direction = 'u'; // Initial direction ('u' for up)
 bool end = false;     // Game end condition
 bool win = false;     // Game win flag
 
 void ShowSymbol(char input, unsigned long duration = 0)
 {
-    int display[8][8] = {{0}};
-    int End[8][8] = {
-        {0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 0, 0},
-        {1, 1, 1, 0, 0, 0, 0, 1},
-        {1, 0, 0, 0, 0, 0, 0, 1},
-        {1, 1, 0, 0, 1, 0, 0, 1},
-        {1, 0, 0, 1, 0, 1, 1, 0},
-        {1, 1, 1, 1, 0, 1, 0, 1},
-        {0, 0, 0, 0, 0, 0, 0, 0}};
-    int Star[8][8] = {
-        {0, 0, 0, 1, 0, 0, 0, 0},
-        {0, 0, 0, 1, 0, 0, 0, 0},
-        {0, 0, 1, 1, 1, 0, 0, 0},
-        {1, 1, 1, 1, 1, 1, 1, 0},
-        {0, 1, 1, 1, 1, 1, 0, 0},
-        {0, 0, 1, 1, 1, 0, 0, 0},
-        {0, 1, 1, 0, 1, 1, 0, 0},
-        {1, 1, 0, 0, 0, 1, 1, 0}};
-    int N1[8][8] = {
-        {0, 0, 0, 1, 1, 0, 0, 0},
-        {0, 0, 1, 1, 1, 0, 0, 0},
-        {0, 1, 1, 1, 1, 0, 0, 0},
-        {0, 0, 0, 1, 1, 0, 0, 0},
-        {0, 0, 0, 1, 1, 0, 0, 0},
-        {0, 0, 0, 1, 1, 0, 0, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0}};
-    int N2[8][8] = {
-        {0, 0, 1, 1, 1, 1, 0, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0},
-        {0, 1, 1, 0, 0, 1, 1, 0},
-        {0, 0, 0, 0, 1, 1, 1, 0},
-        {0, 0, 0, 1, 1, 1, 0, 0},
-        {0, 0, 1, 1, 1, 0, 0, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0}};
-    int N3[8][8] = {
-        {0, 0, 1, 1, 1, 1, 0, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0},
-        {0, 0, 0, 0, 0, 1, 1, 0},
-        {0, 0, 1, 1, 1, 1, 0, 0},
-        {0, 0, 1, 1, 1, 1, 0, 0},
-        {0, 0, 0, 0, 0, 1, 1, 0},
-        {0, 1, 1, 1, 1, 1, 1, 0},
-        {0, 0, 1, 1, 1, 1, 0, 0}};
+    uint8_t display[8] = {0};
+
+    uint8_t End[8] = {
+        0b00000000,
+        0b00000000,
+        0b11100001,
+        0b10000001,
+        0b11001001,
+        0b10010110,
+        0b11110101,
+        0b00000000};
+
+    uint8_t Star[8] = {
+        0b00010000,
+        0b00010000,
+        0b00111000,
+        0b11111110,
+        0b01111100,
+        0b00111000,
+        0b01100110,
+        0b11000011};
+
+    uint8_t N1[8] =
+        {0b00011000,
+         0b00111000,
+         0b01111000,
+         0b00011000,
+         0b00011000,
+         0b00011000,
+         0b01111110,
+         0b01111110};
+
+    uint8_t N2[8] =
+        {0b00111100,
+         0b01111110,
+         0b01100110,
+         0b00001110,
+         0b00011110,
+         0b00111000,
+         0b01111110,
+         0b01111110};
+
+    uint8_t N3[8] =
+        {0b00111100,
+         0b01111110,
+         0b00000110,
+         0b00111110,
+         0b00111110,
+         0b00000110,
+         0b01111110,
+         0b00111100};
     switch (input)
     {
     case '1':
-        memcpy(display, N1, 8 * 8 * sizeof(int));
+        memcpy(display, N1, 8 * sizeof(uint8_t));
         break;
     case '2':
-        memcpy(display, N2, 8 * 8 * sizeof(int));
+        memcpy(display, N2, 8 * sizeof(uint8_t));
         break;
     case '3':
-        memcpy(display, N3, 8 * 8 * sizeof(int));
+        memcpy(display, N3, 8 * sizeof(uint8_t));
         break;
     case 'S':
-        memcpy(display, Star, 8 * 8 * sizeof(int));
+        memcpy(display, Star, 8 * sizeof(uint8_t));
         break;
     case 'E':
-        memcpy(display, End, 8 * 8 * sizeof(int));
+        memcpy(display, End, 8 * sizeof(uint8_t));
         break;
     }
 
-    (duration > 0) ? LM.Symbol(display, duration) : LM.Symbol(display);
+    LM.Symbol(display);
+    delay(duration > 0 ? duration : 1000);
 };
 
 // Function to check user input direction
@@ -275,9 +283,22 @@ void refreshSnake()
 };
 
 // Function to update display based on memory
-void display(unsigned long duration)
+void display(unsigned long duration = 0)
 {
-    (duration > 0) ? LM.Symbol(memory, duration) : LM.Symbol(memory);
+    // Update display based on memory
+    for (int i = 0; i < 8; i++)
+    {
+        for (int j = 0; j < 8; j++)
+        {
+            if (memory[i][j] == 1 || memory[i][j] == -1)
+            {
+                displayBytes[i] |= (1 << j);
+            }
+        }
+    }
+
+    LM.Symbol(displayBytes);
+    delay(duration > 0 ? duration : 1000);
 };
 
 // Function to handle end of game animation
@@ -286,14 +307,15 @@ void ending()
     // Blink display to indicate end of game
     for (int i = 0; i < 10; i++)
     {
-        LM.Symbol(memory);
+        LM.Symbol(displayBytes);
         delay(100);
     }
 
     for (int c = length; c > 0; c--)
     {
         memory[body[c][0]][body[c][1]] = 0;
-        LM.Symbol(memory, 250);
+        LM.Symbol(displayBytes);
+        delay(250);
     }
 
     // Display end game message
@@ -324,7 +346,7 @@ void setup()
     // Blink starting animation
     for (int i = 0; i < 10; i++)
     {
-        LM.Symbol(memory);
+        display();
         delay(200);
     }
 }

@@ -7,7 +7,7 @@ class LEDMatrixChip
 public:
     LEDMatrixChip(int CS, int CLK, int MOSI, int amount = 1, int orientation = 0);
 
-    void clear(int nth = 0);                    // Clears the display (all or specific matrix)
+    void clear(int nth = -1);                    // Clears the display (all or specific matrix)
     
     void turnOn(int Col, int Row, int nth = 0); // Turns on a specific LED
 
