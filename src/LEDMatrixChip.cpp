@@ -24,16 +24,20 @@ LEDMatrixChip::LEDMatrixChip(int CS, int CLK, int MOSI, int amount, int orientat
     digitalWrite(this->CLK, LOW);
     digitalWrite(this->MOSI, LOW);
 
-    uint8_t initRegs[5] = {DECODE_MODE_REG, INTENSITY_REG, SCAN_LIMIT_REG, SHUTDOWN_REG, DISPLAY_TEST_REG};
+    for (int i = 0; i < amount; i++)
+        write_reg(DISPLAY_TEST_REG, 0);
 
-    for (int j = 0; j < 5; j++)
-    {
-        for (int i = 0; i < amount; i++)
-        {
-            write_reg(initRegs[j], 0);
-        }
-        deselectChip();
-    }
+    for(int i = 0; i < amount; i++)
+        write_reg(SCAN_LIMIT_REG, 7);
+
+    for (int i = 0; i < amount; i++)
+        write_reg(DECODE_MODE_REG, 0);
+
+    for (int i = 0; i < amount; i++)
+        write_reg(SHUTDOWN_REG, 1);
+
+    for (int i = 0; i < amount; i++)
+        write_reg(DISPLAY_TEST_REG, 0);
 
     rows = new uint8_t *[8];
     for (int i = 0; i < 8; i++)
@@ -47,15 +51,12 @@ LEDMatrixChip::LEDMatrixChip(int CS, int CLK, int MOSI, int amount, int orientat
 // Clears the display or a specific matrix
 void LEDMatrixChip::clear(int nth)
 {
-    (nth == 0) ? clearAll() : clearNth(nth - 1);
-    deselectChip();
+    (nth == -1) ? clearAll() : clearNth(nth);
 }
 
 // Turns on an individual LED
 void LEDMatrixChip::turnOn(int Col, int Row, int nth)
 {
-    if (nth > 0)
-        nth -= 1;
     rows[limitingGrid(Row)][nth] = 0x01 << limitingGrid(Col);
     write_display();
 }
@@ -63,8 +64,6 @@ void LEDMatrixChip::turnOn(int Col, int Row, int nth)
 // Turns on an entire column
 void LEDMatrixChip::OnCol(int Col, int nth)
 {
-    if (nth > 0)
-        nth -= 1;
     for (int i = 0; i < 8; i++)
     {
         rows[i][nth] = 0x01 << limitingGrid(Col);
@@ -75,8 +74,6 @@ void LEDMatrixChip::OnCol(int Col, int nth)
 // Turns on an entire row
 void LEDMatrixChip::OnRow(int Row, int nth)
 {
-    if (nth > 0)
-        nth -= 1;
     rows[limitingGrid(Row)][nth] = 0xFF;
     write_display();
 }
@@ -84,21 +81,21 @@ void LEDMatrixChip::OnRow(int Row, int nth)
 // Custom column display with shift support
 void LEDMatrixChip::customCol(uint8_t userByte, int Col, int nth, int shift)
 {
-    if (nth > 0)
-        nth -= 1;
     adjustShift(shift, userByte);
+
     for (int i = 0; i < 8; i++)
     {
-        rows[i][nth] |= (0x01 << limitingGrid(Col));
+        if (userByte & (0x01 << i))
+            rows[i][nth] |= (0x01 << limitingGrid(Col));
     }
+
     write_display();
 }
 
 // Custom row display with shift support
 void LEDMatrixChip::customRow(uint8_t userByte, int Row, int nth, int shift)
 {
-    if (nth > 0)
-        nth -= 1;
+
     adjustShift(shift, userByte);
     rows[limitingGrid(Row)][nth] = displayByte;
     write_display();
@@ -112,41 +109,51 @@ void LEDMatrixChip::Test()
         write_reg(DISPLAY_TEST_REG, 1);
     }
     deselectChip();
-    delay(250);
+    delay(500);
 
     for (int j = 0; j < amount; j++)
     {
         write_reg(DISPLAY_TEST_REG, 0);
     }
     deselectChip();
-    delay(250);
+    delay(500);
 }
 
 // Loads a custom symbol onto a matrix
 void LEDMatrixChip::Symbol(uint8_t UserMatrix[8], int nth)
 {
-    if (nth > 0)
-        nth -= 1;
     for (int i = 0; i < 8; i++)
     {
         rows[i][nth] = UserMatrix[i];
     }
-    deselectChip();
+    write_display();
 }
 
 // SPI Data Transfer
 void LEDMatrixChip::transfer(uint8_t *p_data, uint8_t len)
 {
-    digitalWrite(CS, LOW);
-    for (int i = 0; i < len; i++)
+    uint8_t mask;
+
+    digitalWrite(CS, LOW); // Select the chip
+    delayMicroseconds(1);  // Small delay
+
+    for (int i = 0; i < len; i++) // Iterate through the bytes
     {
-        for (uint8_t mask = 0x80; mask; mask >>= 1)
+        mask = 0x80; // Start with the most significant bit
+        do
         {
+            // Set MOSI high or low based on the current bit
             digitalWrite(MOSI, (p_data[i] & mask) ? HIGH : LOW);
-            digitalWrite(CLK, HIGH);
-            digitalWrite(CLK, LOW);
-        }
+
+            delayMicroseconds(1);
+            digitalWrite(CLK, HIGH); // Clock in the data
+            delayMicroseconds(1);
+            digitalWrite(CLK, LOW); // Prepare for next bit
+
+            mask >>= 1; // Shift the mask to the next bit
+        } while (mask != 0); // Continue until all bits are sent
     }
+    
 }
 
 // Writes a value to a register
@@ -165,8 +172,8 @@ void LEDMatrixChip::write_display()
         {
             write_reg(i + 1, rows[i][j]);
         }
+        deselectChip();
     }
-    deselectChip();
 }
 
 // Constrains a value between 0 and 7

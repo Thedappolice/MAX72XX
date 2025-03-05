@@ -1,20 +1,78 @@
-#include <LEDMatrix.h>
 #include <LEDMatrixChip.h>
 
+// Define SPI communication pins
 #define DATA_PIN 2
 #define CHIP_SELECT_PIN 3
 #define CLOCK_PIN 4
 
-LEDMatrixChip LM(CHIP_SELECT_PIN, CLOCK_PIN, DATA_PIN);
+// Initialization: LEDMatrixChip(CHIP_SELECT, CLOCK, DATA, num_of_chips, orientation)
+LEDMatrixChip LM(CHIP_SELECT_PIN, CLOCK_PIN, DATA_PIN, 1, 0);
 
-byte symbol[] = {
-    0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e};
+/*
+  Class name Object_name(
+  Chip Select pin,
+  Clock pin,
+  Data pin,
+  Number of matrix chips (default 1),
+  Orientation (default 0)
+  )
+*/
+
+// Custom row/column patterns (each bit represents an LED state: 1 = ON, 0 = OFF)
+uint8_t Example_Col = 0b00011100; // Custom pattern for a column
+uint8_t Example_Row = 0b11100011; // Custom pattern for a row
 
 void setup()
 {
-    pinMode(LED_BUILTIN, OUTPUT);
+    LM.Test(); // Runs a test sequence to verify wiring
 }
+
 void loop()
 {
-    LM.Symbol(symbol);
+    LM.turnOn(2, 4);
+    /*
+      Turns on a single LED at a specific position.
+      Parameters:
+      Column index (0-7),
+      Row index (0-7),
+      nth matrix (default 0)
+    */
+
+    LM.OnCol(3);
+    /*
+      Turns on all LEDs in a specific column.
+      Parameters:
+      Column index (0-7),
+      nth matrix (default 0)
+    */
+
+    LM.OnRow(6);
+    /*
+      Turns on all LEDs in a specific row.
+      Parameters:
+      Row index (0-7),
+      nth matrix (default 0)
+    */
+
+    LM.customCol(Example_Col, 1);
+    /*
+      Displays a custom column pattern.
+      Parameters:
+      Byte pattern (each bit controls an LED in the column),
+      Column index (0-7),
+      nth matrix (default 0),
+      shift (default 0)
+    */
+
+    LM.customRow(Example_Row, 2);
+    /*
+      Displays a custom row pattern.
+      Parameters:
+      Byte pattern (each bit controls an LED in the row),
+      Row index (0-7),
+      nth matrix (default 0),
+      shift (default 0)
+    */
+
+    // LM.Symbol(2D array); // Displays a full 8x8 custom symbol (not used in this example)
 }

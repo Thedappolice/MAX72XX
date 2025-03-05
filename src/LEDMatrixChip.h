@@ -8,7 +8,9 @@ public:
     LEDMatrixChip(int CS, int CLK, int MOSI, int amount = 1, int orientation = 0);
 
     void clear(int nth = 0);                    // Clears the display (all or specific matrix)
+    
     void turnOn(int Col, int Row, int nth = 0); // Turns on a specific LED
+
     void OnCol(int Col, int nth = 0);           // Turns on an entire column
     void OnRow(int Row, int nth = 0);           // Turns on an entire row
 
