@@ -26,18 +26,23 @@ LEDMatrixChip::LEDMatrixChip(int CS, int CLK, int MOSI, int amount, int orientat
 
     for (int i = 0; i < amount; i++)
         write_reg(DISPLAY_TEST_REG, 0);
+    deselectChip();    
 
     for(int i = 0; i < amount; i++)
         write_reg(SCAN_LIMIT_REG, 7);
+    deselectChip();    
 
     for (int i = 0; i < amount; i++)
         write_reg(DECODE_MODE_REG, 0);
+    deselectChip();
 
     for (int i = 0; i < amount; i++)
         write_reg(SHUTDOWN_REG, 1);
+    deselectChip();
 
     for (int i = 0; i < amount; i++)
         write_reg(DISPLAY_TEST_REG, 0);
+    deselectChip();
 
     rows = new uint8_t *[8];
     for (int i = 0; i < 8; i++)
